@@ -35,6 +35,21 @@ def getRightNumber(number,isanime=False):
     suffix = num[index:]
     return prefix + '-' + suffix
 
+def split_actor_alias(actor: str) -> typing.List[str]:
+    """
+    保留括号内别名的完整原名，同时补充括号外的演员名和括号内的别名
+    例如: '河北彩花（河北彩伽）' -> ['河北彩花（河北彩伽）', '河北彩花', '河北彩伽']
+    """
+    aliases = re.findall(r'[(\uff08](.*?)[)\uff09]', actor)
+    if not aliases:
+        return [actor]
+    base = re.sub(r'[(\uff08].*?[)\uff09]', '', actor).strip()
+    names = [actor]
+    for name in ([base] if base else []) + [alias.strip() for alias in aliases if alias.strip()]:
+        if name not in names:
+            names.append(name)
+    return names
+
 def get_data_from_json(
         file_number: str,
         open_cc: opencc.OpenCC,
@@ -127,6 +142,8 @@ def get_data_from_json(
     title = json_data.get('title')
     actor_list = str(json_data.get('actor')).strip("[ ]").replace("'", '').split(',')  # 字符串转列表
     actor_list = [actor.strip() for actor in actor_list]  # 去除空白
+    # 括号内的别名拆为独立演员名，括号外的演员名同样保留，如 河北彩花（河北彩伽）-> 河北彩花, 河北彩伽
+    actor_list = [name for actor in actor_list for name in split_actor_alias(actor)]
     # 处理多导演
     director = str(json_data.get('director')).strip("[ ]").replace('xa0', '').replace("'", '').replace('\\', '').split(',')  # 字符串转列表
     director = [d for d in (d.strip() for d in director) if d]  # 使用生成器表达式避免重复strip
@@ -173,7 +190,6 @@ def get_data_from_json(
     # ====================处理异常字符====================== #\/:*?"<>|
     actor = special_characters_replacement(actor)
     actor_list = [special_characters_replacement(a) for a in actor_list]
-    actor_list.extend([alias for name in actor_list for alias in re.findall(r'[(\uff08](.*?)[)\uff09]', name)]) # 添加由中英文括号包裹起来的别名
     title = special_characters_replacement(title)
     label = special_characters_replacement(label)
     outline = special_characters_replacement(outline)
